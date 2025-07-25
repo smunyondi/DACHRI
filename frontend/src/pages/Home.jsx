@@ -1,12 +1,16 @@
 import React, { useEffect, useState, useRef } from "react";
-import { fetchProducts } from "../utils/api";
+import { fetchProducts, addToCart } from "../utils/api";
 import ProductCard from "../components/ProductCard";
+import Notification from "../components/Notification";
 import { Link } from "react-router-dom";
 
-const Home = ({ search }) => {
+const getCartKey = (userId) => userId ? `cart_${userId}` : "cart_guest";
+
+const Home = ({ search, cart, setCart, userId }) => {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [notification, setNotification] = useState({ message: "", type: "success" });
   const productsRef = useRef(null);
 
   useEffect(() => {
@@ -30,6 +34,20 @@ const Home = ({ search }) => {
     }
   }, [search]);
 
+  const handleAddToCart = async (product) => {
+    const token = localStorage.getItem("token");
+    if (!token) return;
+    try {
+      const updatedCart = await addToCart(product._id, 1, token);
+      setCart(updatedCart.items || []);
+      setNotification({ message: `${product.model_name} added to cart!`, type: "success" });
+    } catch (err) {
+      setNotification({ message: "Failed to add to cart.", type: "error" });
+    }
+  };
+
+  const handleNotificationClose = () => setNotification({ message: "", type: "success" });
+
   if (loading) return <div className="text-center mt-10 text-lg">Loading...</div>;
   if (error) return <div className="text-center mt-10 text-red-500">{error}</div>;
 
@@ -49,6 +67,7 @@ const Home = ({ search }) => {
 
   return (
     <div className="w-full px-2 md:px-8 pt-28 md:pt-20">
+      <Notification message={notification.message} type={notification.type} onClose={handleNotificationClose} />
       {/* Hero Section */}
       <section
         className="bg-dachriOff rounded-xl shadow-lg mb-8 p-4 sm:p-8 flex flex-col md:flex-row items-center justify-between gap-6"
@@ -106,37 +125,10 @@ const Home = ({ search }) => {
       </section>
 
       <div className="w-full px-2 md:px-8">
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6 md:gap-8">
-          {filteredProducts.length === 0 ? (
-            <div className="col-span-full text-center text-red-500 font-semibold py-8">
-              No products found matching your search.
-            </div>
-          ) : (
-            filteredProducts.map((product) => (
-              <Link
-                to={`/products/${product._id}`}
-                key={product._id}
-                className="bg-white rounded-lg shadow-lg hover:shadow-2xl transition-shadow duration-200 p-3 sm:p-4 flex flex-col items-center group"
-              >
-                {product.photo && (
-                  <img
-                    src={`http://localhost:5000/uploads/${product.photo}`}
-                    alt={product.model_name}
-                    className="rounded-lg mb-4 w-40 h-40 object-cover group-hover:scale-105 transition-transform duration-200"
-                  />
-                )}
-                <div className="w-full text-center">
-                  <div className="font-bold text-lg mb-1">{product.brand} {product.model_name}</div>
-                  <div className="text-blue-700 font-semibold text-xl mb-2">
-                    Ksh {product.price}
-                  </div>
-                  <div className={`inline-block px-3 py-1 rounded-full text-xs font-semibold ${product.stock > 0 ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
-                    {product.stock > 0 ? "In Stock" : "Out of Stock"}
-                  </div>
-                </div>
-              </Link>
-            ))
-          )}
+        <div ref={productsRef} className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+          {filteredProducts.map((product) => (
+            <ProductCard key={product._id} product={product} onAddToCart={handleAddToCart} />
+          ))}
         </div>
       </div>
     </div>

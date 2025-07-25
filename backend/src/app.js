@@ -3,6 +3,7 @@ const mongoose = require('mongoose');
 const bodyParser = require('body-parser');
 const cors = require('cors');
 const routes = require('./routes/index');
+const authRoutes = require('./routes/auth');
 const path = require('path');
 
 const app = express();
@@ -14,6 +15,12 @@ app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
 
+// Global request logger
+app.use((req, res, next) => {
+    console.log(`[DEBUG] Incoming request: ${req.method} ${req.url}`);
+    next();
+});
+
 // MongoDB connection
 mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/dachri-shoes', {
     useNewUrlParser: true,
@@ -24,6 +31,7 @@ mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/dachri-sh
 
 // Routes
 app.use('/api', routes);
+app.use('/api/auth', authRoutes);
 
 // Start the server
 app.listen(PORT, () => {

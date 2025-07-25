@@ -1,11 +1,15 @@
 import React, { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import axios from "axios";
+import { addToCart } from "../utils/api";
+import Notification from "../components/Notification";
+import { FaShoppingCart } from "react-icons/fa";
 
-const ProductDetails = () => {
+const ProductDetails = ({ cart, setCart }) => {
   const { id } = useParams();
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [notification, setNotification] = useState({ message: "", type: "success" });
 
   useEffect(() => {
     axios.get(`/api/products/${id}`).then(res => {
@@ -14,11 +18,29 @@ const ProductDetails = () => {
     });
   }, [id]);
 
+  const handleAddToCart = async () => {
+    const token = localStorage.getItem("token");
+    if (!token) {
+      setNotification({ message: "Please login to add to cart.", type: "error" });
+      return;
+    }
+    try {
+      const updatedCart = await addToCart(product._id, 1, token);
+      setCart && setCart(updatedCart.items || []);
+      setNotification({ message: `${product.model_name} added to cart!`, type: "success" });
+    } catch (err) {
+      setNotification({ message: "Failed to add to cart.", type: "error" });
+    }
+  };
+
+  const handleNotificationClose = () => setNotification({ message: "", type: "success" });
+
   if (loading) return <div className="text-center mt-10 text-lg">Loading...</div>;
   if (!product) return <div className="text-center mt-10 text-red-500">Product not found.</div>;
 
   return (
     <div className="container mx-auto p-4 flex flex-col items-center">
+      <Notification message={notification.message} type={notification.type} onClose={handleNotificationClose} />
       <Link to="/" className="mb-6 text-blue-600 hover:underline">&larr; Back to Home</Link>
       <div className="bg-white rounded-lg shadow-lg p-8 flex flex-col md:flex-row items-center max-w-3xl w-full">
         {product.photo && (
@@ -43,6 +65,13 @@ const ProductDetails = () => {
             <li><b>Width:</b> {product.width}</li>
             <li><b>Material:</b> {product.material}</li>
           </ul>
+          <button
+            className="bg-dachriRed text-white px-6 py-3 rounded hover:bg-dachriNavy font-bold text-lg shadow transition flex items-center gap-2"
+            onClick={handleAddToCart}
+            title={!localStorage.getItem("token") ? 'Login to add products to cart' : 'Add to cart'}
+          >
+            <FaShoppingCart className="text-xl" /> Add to Cart
+          </button>
         </div>
       </div>
     </div>
