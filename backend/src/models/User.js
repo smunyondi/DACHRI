@@ -7,7 +7,8 @@ const userSchema = new mongoose.Schema({
   phone: { type: String, required: true }, // Phone number with country code
   isAdmin: { type: Boolean, default: false }, // Admin protection field
   blocked: { type: Boolean, default: false }, // Blocked user field
-  online: { type: Boolean, default: false } // Online status field
+  online: { type: Boolean, default: false }, // Online status field (legacy, can be ignored)
+  lastActive: { type: Date, default: Date.now } // Last activity timestamp
 }, { timestamps: true });
 
 module.exports = mongoose.model('User', userSchema);

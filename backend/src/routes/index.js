@@ -10,10 +10,10 @@ const { authMiddleware, adminMiddleware } = require('../middleware/auth');
 const { logout } = require('../controllers/authController');
 const { getCart, addToCart, removeFromCart, updateCartItem, clearCart } = require('../controllers/cartController');
 
-console.log('Imported product controller:', { getAllProducts, addProduct, updateProduct, deleteProduct, getProductById });
-console.log('Imported user controller:', { getAllUsers, getUserCount, toggleBlockUser });
-console.log('auth middleware:', authMiddleware);
-console.log('upload.single:', multer({ storage: multer.diskStorage({ destination: (req, file, cb) => cb(null, 'uploads/'), filename: (req, file, cb) => cb(null, Date.now() + path.extname(file.originalname)) }) }).single);
+// console.log('Imported product controller:', { getAllProducts, addProduct, updateProduct, deleteProduct, getProductById });
+// console.log('Imported user controller:', { getAllUsers, getUserCount, toggleBlockUser });
+// console.log('auth middleware:', authMiddleware);
+// console.log('upload.single:', multer({ storage: multer.diskStorage({ destination: (req, file, cb) => cb(null, 'uploads/'), filename: (req, file, cb) => cb(null, Date.now() + path.extname(file.originalname)) }) }).single);
 
 // Multer setup
 const storage = multer.diskStorage({
@@ -69,5 +69,10 @@ router.post('/test', (req, res) => res.send('Test OK'));
 
 // Logout route
 router.post('/auth/logout', authMiddleware, logout);
+
+// Heartbeat endpoint to update lastActive for logged-in users
+router.get('/auth/ping', authMiddleware, (req, res) => {
+  res.json({ ok: true });
+});
 
 module.exports = router;

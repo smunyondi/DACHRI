@@ -2,14 +2,17 @@ import React, { useState } from "react";
 import Login from "../pages/Login";
 import Register from "../pages/Register";
 
-const AuthModal = ({ isOpen, onClose, isAdminSide, title }) => {
+const AuthModal = ({ isOpen, onClose, isAdminSide, title, onLoginSuccess, modalContainerProps }) => {
   const [showLogin, setShowLogin] = useState(true);
 
   if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
-      <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md relative border border-dachriRed">
+      <div
+        className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md relative border border-dachriRed"
+        {...(modalContainerProps || {})}
+      >
         <button
           className="absolute top-3 right-3 text-dachriRed hover:text-dachriNavy text-2xl font-bold transition"
           onClick={onClose}
@@ -30,7 +33,7 @@ const AuthModal = ({ isOpen, onClose, isAdminSide, title }) => {
             Register
           </button>
         </div>
-        {showLogin ? <Login onLogin={onClose} isAdminSide={isAdminSide} title={title} /> : <Register />}
+        {showLogin ? <Login onLogin={onClose} isAdminSide={isAdminSide} title={title} onLoginSuccess={onLoginSuccess} /> : <Register />}
       </div>
     </div>
   );

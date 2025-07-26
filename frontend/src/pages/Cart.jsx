@@ -10,9 +10,9 @@ const Cart = ({ cart, setCart, userId }) => {
 
   const token = localStorage.getItem("token");
 
-  const handleRemove = async (id) => {
+  const handleRemove = async (prodId, color, size) => {
     try {
-      const updatedCart = await removeFromCart(id, token);
+      const updatedCart = await removeFromCart(prodId, token, color, size);
       setCart(updatedCart.items || []);
       setNotification({ message: "Product removed from cart!", type: "success" });
     } catch {
@@ -20,9 +20,9 @@ const Cart = ({ cart, setCart, userId }) => {
     }
   };
 
-  const handleQuantityChange = async (id, quantity) => {
+  const handleQuantityChange = async (id, quantity, color, size) => {
     try {
-      const updatedCart = await updateCartItem(id, quantity, token);
+      const updatedCart = await updateCartItem(id, quantity, token, color, size);
       setCart(updatedCart.items || []);
     } catch {
       setMessage("Failed to update quantity.");
@@ -48,19 +48,30 @@ const Cart = ({ cart, setCart, userId }) => {
         {cart.map(item => {
           const prod = item.product || {};
           const prodId = prod._id;
+          // Find the variant for this cart item
+          const variant = prod.variants?.find(v => v.color === item.color && v.size === item.size);
           return (
             <li key={item._id} className="border-b py-2 flex justify-between items-center">
               <span>
-                <b>{prod.brand || "Unknown Brand"}</b> {prod.model_name || "Unknown Model"} (${prod.price !== undefined ? prod.price : "?"})
+                <b>{prod.brand || "Unknown Brand"}</b> {prod.model_name || "Unknown Model"} (KES {prod.price !== undefined ? Number(prod.price).toLocaleString('en-KE', { style: 'decimal', maximumFractionDigits: 2 }) : "?"})
+                {item.color && (
+                  <span className="ml-2 text-sm text-gray-600">Color: <b>{item.color}</b></span>
+                )}
+                {item.size && (
+                  <span className="ml-2 text-sm text-gray-600">Size: <b>{item.size}</b></span>
+                )}
+                {variant && (
+                  <span className="ml-2 text-sm text-gray-600">SKU: <b>{variant.sku}</b></span>
+                )}
                 <input
                   type="number"
                   min="1"
                   value={item.quantity}
-                  onChange={e => handleQuantityChange(prodId, parseInt(e.target.value))}
+                  onChange={e => handleQuantityChange(prodId, parseInt(e.target.value), item.color, item.size)}
                   className="ml-2 w-16 border rounded px-2"
                 />
               </span>
-              <button className="bg-red-500 text-white px-3 py-1 rounded" onClick={() => handleRemove(prodId)}>
+              <button className="bg-red-500 text-white px-3 py-1 rounded" onClick={() => handleRemove(prodId, item.color, item.size)}>
                 Remove
               </button>
             </li>

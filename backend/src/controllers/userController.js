@@ -3,8 +3,17 @@ const User = require('../models/User');
 // Get all users
 exports.getAllUsers = async (req, res) => {
   try {
-    const users = await User.find({}, '-password');
-    res.json(users);
+    // Use only inclusion projection (no -password)
+    const users = await User.find().select('username email isAdmin blocked online lastActive');
+    // For backward compatibility, also set online=true if lastActive is within 2 seconds
+    const now = Date.now();
+    const usersWithLastActive = users.map(u => {
+      const user = u.toObject();
+      user.lastActive = user.lastActive || null;
+      user.online = user.lastActive && (now - new Date(user.lastActive).getTime() < 2000);
+      return user;
+    });
+    res.json(usersWithLastActive);
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch users' });
   }

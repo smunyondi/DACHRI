@@ -9,6 +9,7 @@ import Register from "./pages/Register";
 import Login from "./pages/Login";
 import Cart from "./pages/Cart";
 import { fetchCart } from "./utils/api";
+import { startHeartbeat, stopHeartbeat } from "./utils/heartbeat";
 import "./App.css";
 
 const getUserId = () => {
@@ -65,6 +66,17 @@ const App = () => {
     window.addEventListener("storage", handleStorage);
     return () => window.removeEventListener("storage", handleStorage);
   }, []);
+
+  // Start/stop heartbeat for online tracking
+  useEffect(() => {
+    const token = getToken();
+    if (token) {
+      startHeartbeat();
+    } else {
+      stopHeartbeat();
+    }
+    return () => stopHeartbeat();
+  }, [userId]);
 
   return (
     <Router>

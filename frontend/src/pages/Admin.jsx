@@ -1,28 +1,99 @@
 import React, { useRef, useState, useEffect } from "react";
-import { fetchProducts, updateProduct, deleteProduct, fetchStats, fetchUsers, blockUser, fetchOrders, updateOrderStatus, deleteOrder } from "../utils/api";
+import { updateProduct, deleteProduct, fetchStats, fetchUsers, blockUser, fetchOrders, updateOrderStatus, deleteOrder } from "../utils/api";
+import { useProducts } from "../context/ProductContext.jsx";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import AuthModal from "../components/AuthModal"; // Import the AuthModal component
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
+import CreatableSelect from "react-select/creatable";
 
 const initialForm = {
   brand: "",
   model_name: "",
   gender: "",
   category: "",
-  colorway: "",
-  size: "",
   width: "",
   material: "",
-  sku_code: "",
   price: "",
-  stock: ""
+  sku_code: "", // Ensure this is always defined
+  variants: [] // Array of { color, size, stock, sku }
 };
 
+const GENDER_OPTIONS = [
+  { value: "Men", label: "Men" },
+  { value: "Women", label: "Women" },
+  { value: "Unisex", label: "Unisex" },
+  { value: "Kids", label: "Kids" },
+];
+const CATEGORY_OPTIONS = [
+  { value: "Sneakers", label: "Sneakers" },
+  { value: "Running", label: "Running" },
+  { value: "Basketball", label: "Basketball" },
+  { value: "Casual", label: "Casual" },
+  { value: "Boots", label: "Boots" },
+  { value: "Sandals", label: "Sandals" },
+  { value: "Slides", label: "Slides" },
+  { value: "Formal", label: "Formal" },
+];
+const WIDTH_OPTIONS = [
+  { value: "Narrow", label: "Narrow" },
+  { value: "Regular", label: "Regular" },
+  { value: "Wide", label: "Wide" },
+  { value: "Extra Wide", label: "Extra Wide" },
+];
+const MATERIAL_OPTIONS = [
+  { value: "Leather", label: "Leather" },
+  { value: "Mesh", label: "Mesh" },
+  { value: "Canvas", label: "Canvas" },
+  { value: "Synthetic", label: "Synthetic" },
+  { value: "Textile", label: "Textile" },
+  { value: "Rubber", label: "Rubber" },
+  { value: "Suede", label: "Suede" },
+];
+
+// Predefined color and size options (can be extended)
+const COLOR_OPTIONS = [
+  { value: "Red", label: "Red" },
+  { value: "Blue", label: "Blue" },
+  { value: "Green", label: "Green" },
+  { value: "Black", label: "Black" },
+  { value: "White", label: "White" },
+  { value: "Yellow", label: "Yellow" },
+  { value: "Gray", label: "Gray" },
+  { value: "Pink", label: "Pink" },
+  { value: "Purple", label: "Purple" },
+  { value: "Orange", label: "Orange" },
+];
+const SIZE_OPTIONS = [
+  { value: "6", label: "6" },
+  { value: "7", label: "7" },
+  { value: "8", label: "8" },
+  { value: "9", label: "9" },
+  { value: "10", label: "10" },
+  { value: "11", label: "11" },
+  { value: "12", label: "12" },
+  { value: "13", label: "13" },
+  { value: "14", label: "14" },
+];
+
+function generateSKU(brand, model) {
+  const brandPart = (brand || "").substring(0, 3).toUpperCase();
+  const modelPart = (model || "").substring(0, 3).toUpperCase();
+  const randomPart = Math.floor(1000 + Math.random() * 9000);
+  return `${brandPart}${modelPart}${randomPart}`;
+}
+
+// Helper to generate consistent SKU for a product
+function generateProductSKU(brand, model) {
+  const brandPart = (brand || "").substring(0, 3).toUpperCase();
+  const modelPart = (model || "").substring(0, 3).toUpperCase();
+  return `${brandPart}${modelPart}`;
+}
+
 const Admin = () => {
+  const { products, loadProducts } = useProducts();
   const [form, setForm] = useState(initialForm);
   const [photo, setPhoto] = useState(null);
-  const [products, setProducts] = useState([]);
   const [editing, setEditing] = useState(null);
   const [message, setMessage] = useState("");
   const [activeTab, setActiveTab] = useState("add"); // "add" or "edit"
@@ -57,17 +128,21 @@ const Admin = () => {
             setMessage("Failed to fetch dashboard stats. Make sure you are logged in as admin.");
             console.error("Stats fetch error:", err);
           });
-      }, 3000); // Poll every 3 seconds for real-time online users
-      // Fetch users from backend
-      fetchUsers(localStorage.getItem("token")).then(setUsers);
-      // Fetch orders from backend
+      }, 1000); // Poll every 1 second for real-time online users
+      // Fetch users from backend every second
+      const fetchUsersInterval = setInterval(() => {
+        fetchUsers(localStorage.getItem("token")).then(users => {
+          // console.log("[DEBUG] fetchUsers result:", users);
+          setUsers(users);
+        });
+      }, 1000);
+      // Fetch orders from backend (one-time)
       fetchOrders(localStorage.getItem("token")).then(setOrders);
-      return () => clearInterval(fetchStatsInterval);
+      return () => {
+        clearInterval(fetchStatsInterval);
+        clearInterval(fetchUsersInterval);
+      };
     }
-  }, []);
-
-  useEffect(() => {
-    loadProducts();
   }, []);
 
   useEffect(() => {
@@ -81,13 +156,21 @@ const Admin = () => {
     };
   }, [editingProduct]);
 
-  const loadProducts = async () => {
-    const data = await fetchProducts();
-    setProducts(data);
-  };
+  // When opening the add product popup, auto-generate SKU (or reuse if exists)
+  useEffect(() => {
+    if (showAddPopup) {
+      // Check if a product with the same brand/model exists
+      const existing = products.find(p => p.brand === form.brand && p.model_name === form.model_name);
+      setForm(f => ({
+        ...f,
+        sku_code: existing ? existing.sku_code : generateProductSKU(f.brand, f.model_name)
+      }));
+    }
+  }, [showAddPopup, form.brand, form.model_name, products]);
 
   const handleChange = (e) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+    setForm({ ...form, [name]: value });
   };
 
   const handlePhotoChange = (e) => {
@@ -99,25 +182,36 @@ const Admin = () => {
     try {
       const formData = new FormData();
       Object.entries(form).forEach(([key, value]) => {
-        formData.append(key, value);
+        if (key === "variants") {
+          formData.append("variants", JSON.stringify(value)); // Always stringify variants
+        } else {
+          formData.append(key, value);
+        }
       });
       if (photo) formData.append("photo", photo);
-
+      const token = localStorage.getItem("token");
       if (editing) {
         await axios.put(`/api/products/${editing}`, formData, {
-          headers: { "Content-Type": "multipart/form-data" },
+          headers: { 
+            "Content-Type": "multipart/form-data",
+            Authorization: `Bearer ${token}`
+          },
         });
         setMessage("Product updated!");
+        await loadProducts(); // <-- await to ensure context is updated before closing modal
       } else {
         await axios.post("/api/products", formData, {
-          headers: { "Content-Type": "multipart/form-data" },
+          headers: { 
+            "Content-Type": "multipart/form-data",
+            Authorization: `Bearer ${token}`
+          },
         });
         setMessage("Product added!");
+        await loadProducts(); // <-- await to ensure context is updated before closing modal
       }
       setForm(initialForm);
       setPhoto(null);
       setEditing(null);
-      loadProducts();
       setActiveTab("add");
       setShowAddPopup(false); // close popup after add
     } catch {
@@ -131,21 +225,19 @@ const Admin = () => {
       model_name: product.model_name || "",
       gender: product.gender || "",
       category: product.category || "",
-      colorway: product.colorway || "",
-      size: product.size || "",
       width: product.width || "",
       material: product.material || "",
-      sku_code: product.sku_code || "",
       price: product.price || "",
-      stock: product.stock || ""
+      variants: product.variants || []
     });
     setEditing(product._id);
     setActiveTab("edit");
   };
 
   const handleDelete = async (id) => {
+    const token = localStorage.getItem("token");
     if (window.confirm("Delete this product?")) {
-      await deleteProduct(id);
+      await deleteProduct(id, token);
       setMessage("Product deleted!");
       loadProducts();
     }
@@ -158,13 +250,10 @@ const Admin = () => {
       model_name: product.model_name || "",
       gender: product.gender || "",
       category: product.category || "",
-      colorway: product.colorway || "",
-      size: product.size || "",
       width: product.width || "",
       material: product.material || "",
-      sku_code: product.sku_code || "",
       price: product.price || "",
-      stock: product.stock || ""
+      variants: Array.isArray(product.variants) ? product.variants : [] // Ensure variants is always an array
     });
     setPhoto(null);
     setTimeout(() => {
@@ -179,16 +268,23 @@ const Admin = () => {
     try {
       const formData = new FormData();
       Object.entries(form).forEach(([key, value]) => {
-        formData.append(key, value);
+        if (key === "variants") {
+          formData.append("variants", JSON.stringify(value)); // Always stringify variants
+        } else {
+          formData.append(key, value);
+        }
       });
       if (photo) formData.append("photo", photo);
-
+      const token = localStorage.getItem("token");
       await axios.put(`/api/products/${editingProduct._id}`, formData, {
-        headers: { "Content-Type": "multipart/form-data" },
+        headers: {
+          "Content-Type": "multipart/form-data",
+          Authorization: `Bearer ${token}`
+        },
       });
       setMessage("Product updated!");
       setEditingProduct(null);
-      loadProducts();
+      await loadProducts(); // <-- await to ensure context is updated before closing modal
     } catch {
       setMessage("Error updating product.");
     }
@@ -244,6 +340,157 @@ const Admin = () => {
       sales,
     };
   });
+
+  // State for variant editor
+  const [variantInput, setVariantInput] = useState({ color: '', size: '', stock: '' });
+  const [colorList, setColorList] = useState(COLOR_OPTIONS);
+  const [sizeList, setSizeList] = useState(SIZE_OPTIONS);
+
+  // Update VariantEditor to use dropdowns
+  function VariantEditor({ variants, setVariants, brand, model, colorOptions, sizeOptions, isEdit }) {
+    const [selectedColor, setSelectedColor] = useState("");
+    const [selectedSize, setSelectedSize] = useState("");
+    const [editInput, setEditInput] = useState({ color: '', size: '', stock: '', sku: '' });
+    const [addInput, setAddInput] = useState({ color: '', size: '', stock: '' });
+
+    // Find the variant matching the selected color and size
+    const selectedIdx = variants.findIndex(v => v.color === selectedColor && v.size === selectedSize);
+    const selectedVariant = selectedIdx !== -1 ? variants[selectedIdx] : null;
+
+    React.useEffect(() => {
+      if (selectedVariant) {
+        setEditInput({ ...selectedVariant });
+      } else {
+        setEditInput({ color: selectedColor, size: selectedSize, stock: '', sku: '' });
+      }
+    }, [selectedColor, selectedSize, selectedVariant]);
+
+    // Auto-select first color and size if variants exist and nothing is selected
+    React.useEffect(() => {
+      if (variants.length > 0 && !selectedColor) {
+        setSelectedColor(variants[0].color);
+      }
+    }, [variants]);
+    React.useEffect(() => {
+      if (selectedColor && variants.length > 0) {
+        const sizesForColor = variants.filter(v => v.color === selectedColor).map(v => v.size);
+        if (sizesForColor.length > 0 && !selectedSize) {
+          setSelectedSize(sizesForColor[0]);
+        }
+      }
+    }, [selectedColor, variants]);
+
+    const handleEditChange = e => {
+      const { name, value } = e.target;
+      setEditInput(v => ({ ...v, [name]: value }));
+    };
+
+    const handleAddChange = e => {
+      const { name, value } = e.target;
+      setAddInput(v => ({ ...v, [name]: value }));
+    };
+
+    const handleSaveEdit = () => {
+      if (!editInput.color || !editInput.size || !editInput.stock) return;
+      const updated = variants.map((v, idx) => idx === selectedIdx ? { ...editInput, stock: Number(editInput.stock) } : v);
+      setVariants(updated);
+    };
+
+    const handleRemoveVariant = () => {
+      setVariants(variants.filter((v, idx) => idx !== selectedIdx));
+      setSelectedColor("");
+      setSelectedSize("");
+    };
+
+    const handleAddVariant = () => {
+      if (!addInput.color || !addInput.size || !addInput.stock) return;
+      setVariants([...(variants || []), { ...addInput, stock: Number(addInput.stock), sku: `${brand?.substring(0,3)?.toUpperCase() || ''}${model?.substring(0,3)?.toUpperCase() || ''}-${addInput.color}-${addInput.size}` }]);
+      setAddInput({ color: '', size: '', stock: '' });
+    };
+
+    // Get available colors and sizes from existing variants
+    const availableColors = [...new Set(variants.map(v => v.color))];
+    const availableSizes = selectedColor ? [...new Set(variants.filter(v => v.color === selectedColor).map(v => v.size))] : [];
+
+    // Only show selection section if isEdit is true
+    return (
+      <div>
+        {isEdit && (
+          <div className="mb-2 flex gap-2 items-center">
+            <div className="text-sm font-bold text-dachriNavy">Select variant to edit:</div>
+            <select className="border p-2 rounded" value={selectedColor} onChange={e => { setSelectedColor(e.target.value); setSelectedSize(""); }}>
+              <option value="">Color</option>
+              {availableColors.map(color => (
+                <option key={color} value={color}>{color}</option>
+              ))}
+            </select>
+            <select className="border p-2 rounded" value={selectedSize} onChange={e => setSelectedSize(e.target.value)} disabled={!selectedColor}>
+              <option value="">Size</option>
+              {availableSizes.map(size => (
+                <option key={size} value={size}>{size}</option>
+              ))}
+            </select>
+          </div>
+        )}
+        {/* Edit form for selected variant */}
+        {isEdit && selectedVariant && (
+          <div className="flex gap-2 mb-2 items-end mt-2 bg-blue-50 p-2 rounded border border-blue-200">
+            <select className="border p-2 rounded w-1/4" name="color" value={editInput.color} onChange={handleEditChange}>
+              <option value="">Color</option>
+              {colorOptions.map(opt => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+            <select className="border p-2 rounded w-1/4" name="size" value={editInput.size} onChange={handleEditChange}>
+              <option value="">Size</option>
+              {sizeOptions.map(opt => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+            <input className="border p-2 rounded w-1/4" name="stock" type="number" min="0" placeholder="Stock" value={editInput.stock} onChange={handleEditChange} />
+            <input className="border p-2 rounded w-1/4 bg-gray-100" name="sku" placeholder="SKU" value={editInput.sku} readOnly />
+            <button type="button" className="bg-green-500 text-white px-3 py-1 rounded" onClick={handleSaveEdit}>Save</button>
+            <button type="button" className="text-red-500 hover:underline" onClick={handleRemoveVariant}>Remove</button>
+          </div>
+        )}
+        {/* Add new variant form (always show in add, only when not editing in edit) */}
+        {(!isEdit || !selectedVariant) && (
+          <div className="flex gap-2 mb-2 mt-2 bg-gray-50 p-2 rounded border border-gray-200">
+            <select className="border p-2 rounded w-1/4" name="color" value={addInput.color} onChange={handleAddChange}>
+              <option value="">Color</option>
+              {colorOptions.map(opt => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+            <select className="border p-2 rounded w-1/4" name="size" value={addInput.size} onChange={handleAddChange}>
+              <option value="">Size</option>
+              {sizeOptions.map(opt => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+            <input className="border p-2 rounded w-1/4" name="stock" type="number" min="0" placeholder="Stock" value={addInput.stock} onChange={handleAddChange} />
+            <button type="button" className="bg-blue-500 text-white px-3 py-1 rounded" onClick={handleAddVariant}>Add</button>
+          </div>
+        )}
+        {/* Always show list of added variants */}
+        {variants.length > 0 && (
+          <div className="mt-2">
+            <div className="font-semibold text-sm mb-1">Added Variants:</div>
+            <ul className="space-y-1">
+              {variants.map((v, idx) => (
+                <li key={v.sku || v.color + v.size} className="flex items-center gap-2 text-xs bg-gray-100 rounded px-2 py-1">
+                  <span>{v.color} / {v.size} / Stock: {v.stock} / SKU: {v.sku}</span>
+                  {!isEdit && (
+                    <button type="button" className="text-red-500 hover:underline ml-2" onClick={() => setVariants(variants.filter((_, i) => i !== idx))}>Remove</button>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
+    );
+  }
 
   return (
     <>
@@ -349,17 +596,83 @@ const Admin = () => {
                     encType="multipart/form-data"
                   >
                     <input className="w-full border p-2 rounded" name="photo" type="file" accept="image/*" onChange={handlePhotoChange} />
-                    <input className="w-full border p-2 rounded" name="brand" placeholder="Brand" value={form.brand} onChange={handleChange} required />
-                    <input className="w-full border p-2 rounded" name="model_name" placeholder="Model Name" value={form.model_name} onChange={handleChange} required />
-                    <input className="w-full border p-2 rounded" name="gender" placeholder="Gender" value={form.gender} onChange={handleChange} />
-                    <input className="w-full border p-2 rounded" name="category" placeholder="Category" value={form.category} onChange={handleChange} />
-                    <input className="w-full border p-2 rounded" name="colorway" placeholder="Colorway" value={form.colorway} onChange={handleChange} />
-                    <input className="w-full border p-2 rounded" name="size" placeholder="Size" value={form.size} onChange={handleChange} />
-                    <input className="w-full border p-2 rounded" name="width" placeholder="Width" value={form.width} onChange={handleChange} />
-                    <input className="w-full border p-2 rounded" name="material" placeholder="Material" value={form.material} onChange={handleChange} />
-                    <input className="w-full border p-2 rounded" name="sku_code" placeholder="SKU Code" value={form.sku_code} onChange={handleChange} required />
-                    <input className="w-full border p-2 rounded" name="price" type="number" step="0.01" placeholder="Price" value={form.price} onChange={handleChange} required />
-                    <input className="w-full border p-2 rounded" name="stock" type="number" placeholder="Stock" value={form.stock} onChange={handleChange} required />
+                    <input className="w-full border p-2 rounded" name="brand" placeholder="Brand" value={form.brand || ""} onChange={handleChange} required />
+                    <input className="w-full border p-2 rounded" name="model_name" placeholder="Model Name" value={form.model_name || ""} onChange={handleChange} required />
+                    <div>
+                      <label className="block font-semibold mb-1">Gender</label>
+                      <select
+                        className="w-full border p-2 rounded"
+                        name="gender"
+                        value={form.gender}
+                        onChange={handleChange}
+                        required
+                      >
+                        <option value="">Select gender</option>
+                        {GENDER_OPTIONS.map(opt => (
+                          <option key={opt.value} value={opt.value}>{opt.label}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block font-semibold mb-1">Category</label>
+                      <select
+                        className="w-full border p-2 rounded"
+                        name="category"
+                        value={form.category}
+                        onChange={handleChange}
+                        required
+                      >
+                        <option value="">Select category</option>
+                        {CATEGORY_OPTIONS.map(opt => (
+                          <option key={opt.value} value={opt.value}>{opt.label}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block font-semibold mb-1">Width</label>
+                      <select
+                        className="w-full border p-2 rounded"
+                        name="width"
+                        value={form.width}
+                        onChange={handleChange}
+                        required
+                      >
+                        <option value="">Select width</option>
+                        {WIDTH_OPTIONS.map(opt => (
+                          <option key={opt.value} value={opt.value}>{opt.label}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block font-semibold mb-1">Material</label>
+                      <select
+                        className="w-full border p-2 rounded"
+                        name="material"
+                        value={form.material}
+                        onChange={handleChange}
+                        required
+                      >
+                        <option value="">Select material</option>
+                        {MATERIAL_OPTIONS.map(opt => (
+                          <option key={opt.value} value={opt.value}>{opt.label}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <input className="w-full border p-2 rounded bg-gray-100" name="sku_code" placeholder="SKU Code" value={form.sku_code || ""} readOnly />
+                    {/* Variants Section */}
+                    <div className="mb-4">
+                      <label className="block font-semibold mb-1">Variants (Color, Size, Stock)</label>
+                      <VariantEditor
+                        variants={form.variants}
+                        setVariants={v => setForm(f => ({ ...f, variants: v }))}
+                        brand={form.brand}
+                        model={form.model_name}
+                        colorOptions={colorList}
+                        sizeOptions={sizeList}
+                        isEdit={false}
+                      />
+                    </div>
+                    <input className="w-full border p-2 rounded" name="price" type="number" step="0.01" placeholder="Price" value={form.price || ""} onChange={handleChange} required />
                     <div className="flex justify-between">
                       <button className="bg-blue-500 hover:bg-blue-700 text-white px-4 py-2 rounded" type="submit">
                         Add Shoe
@@ -387,7 +700,7 @@ const Admin = () => {
                   {[...products].slice(-5).reverse().map((product) => (
                     <li key={product._id} className="border-b py-2 flex justify-between items-center">
                       <span>
-                        <b>{product.brand}</b> {product.model_name} (${product.price})
+                        <b>{product.brand}</b> {product.model_name} <span className="text-dachriRed">(KES {Number(product.price).toLocaleString('en-KE', { style: 'decimal', maximumFractionDigits: 2 })})</span>
                         {product.photo && (
                           <img
                             src={`http://localhost:5000/uploads/${product.photo}`}
@@ -412,17 +725,86 @@ const Admin = () => {
                 ref={editFormRef}
               >
                 <input className="w-full border p-2 rounded" name="photo" type="file" accept="image/*" onChange={handlePhotoChange} />
-                <input className="w-full border p-2 rounded" name="brand" placeholder="Brand" value={form.brand} onChange={handleChange} required />
-                <input className="w-full border p-2 rounded" name="model_name" placeholder="Model Name" value={form.model_name} onChange={handleChange} required />
-                <input className="w-full border p-2 rounded" name="gender" placeholder="Gender" value={form.gender} onChange={handleChange} />
-                <input className="w-full border p-2 rounded" name="category" placeholder="Category" value={form.category} onChange={handleChange} />
-                <input className="w-full border p-2 rounded" name="colorway" placeholder="Colorway" value={form.colorway} onChange={handleChange} />
-                <input className="w-full border p-2 rounded" name="size" placeholder="Size" value={form.size} onChange={handleChange} />
-                <input className="w-full border p-2 rounded" name="width" placeholder="Width" value={form.width} onChange={handleChange} />
-                <input className="w-full border p-2 rounded" name="material" placeholder="Material" value={form.material} onChange={handleChange} />
-                <input className="w-full border p-2 rounded" name="sku_code" placeholder="SKU Code" value={form.sku_code} onChange={handleChange} required />
-                <input className="w-full border p-2 rounded" name="price" type="number" step="0.01" placeholder="Price" value={form.price} onChange={handleChange} required />
-                <input className="w-full border p-2 rounded" name="stock" type="number" placeholder="Stock" value={form.stock} onChange={handleChange} required />
+                <input className="w-full border p-2 rounded" name="brand" placeholder="Brand" value={form.brand || ""} onChange={handleChange} required />
+                <input className="w-full border p-2 rounded" name="model_name" placeholder="Model Name" value={form.model_name || ""} onChange={handleChange} required />
+                {/* Gender dropdown */}
+                <div>
+                  <label className="block font-semibold mb-1">Gender</label>
+                  <select
+                    className="w-full border p-2 rounded"
+                    name="gender"
+                    value={form.gender}
+                    onChange={handleChange}
+                    required
+                  >
+                    <option value="">Select gender</option>
+                    {GENDER_OPTIONS.map(opt => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
+                </div>
+                {/* Category dropdown */}
+                <div>
+                  <label className="block font-semibold mb-1">Category</label>
+                  <select
+                    className="w-full border p-2 rounded"
+                    name="category"
+                    value={form.category}
+                    onChange={handleChange}
+                    required
+                  >
+                    <option value="">Select category</option>
+                    {CATEGORY_OPTIONS.map(opt => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
+                </div>
+                {/* Width dropdown */}
+                <div>
+                  <label className="block font-semibold mb-1">Width</label>
+                  <select
+                    className="w-full border p-2 rounded"
+                    name="width"
+                    value={form.width}
+                    onChange={handleChange}
+                    required
+                  >
+                    <option value="">Select width</option>
+                    {WIDTH_OPTIONS.map(opt => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
+                </div>
+                {/* Material dropdown */}
+                <div>
+                  <label className="block font-semibold mb-1">Material</label>
+                  <select
+                    className="w-full border p-2 rounded"
+                    name="material"
+                    value={form.material}
+                    onChange={handleChange}
+                    required
+                  >
+                    <option value="">Select material</option>
+                    {MATERIAL_OPTIONS.map(opt => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <input className="w-full border p-2 rounded" name="price" type="number" step="0.01" placeholder="Price" value={form.price || ""} onChange={handleChange} required />
+                {/* Variants Section */}
+                <div className="mb-4">
+                  <label className="block font-semibold mb-1">Variants (Color, Size, Stock)</label>
+                  <VariantEditor
+                    variants={form.variants || []}
+                    setVariants={variants => setForm(f => ({ ...f, variants }))}
+                    brand={form.brand}
+                    model={form.model_name}
+                    colorOptions={COLOR_OPTIONS}
+                    sizeOptions={SIZE_OPTIONS}
+                    isEdit={true} // Always true in edit mode
+                  />
+                </div>
                 <div className="flex justify-between">
                   <button className="bg-yellow-500 hover:bg-yellow-700 text-white px-4 py-2 rounded" type="submit">
                     Update Shoe
@@ -457,17 +839,26 @@ const Admin = () => {
                   </button>
                   <form onSubmit={handleUpdate} encType="multipart/form-data" className="space-y-3">
                     <input className="w-full border p-2 rounded" name="photo" type="file" accept="image/*" onChange={handlePhotoChange} />
-                    <input className="w-full border p-2 rounded" name="brand" placeholder="Brand" value={form.brand} onChange={handleChange} required />
-                    <input className="w-full border p-2 rounded" name="model_name" placeholder="Model Name" value={form.model_name} onChange={handleChange} required />
-                    <input className="w-full border p-2 rounded" name="gender" placeholder="Gender" value={form.gender} onChange={handleChange} />
-                    <input className="w-full border p-2 rounded" name="category" placeholder="Category" value={form.category} onChange={handleChange} />
-                    <input className="w-full border p-2 rounded" name="colorway" placeholder="Colorway" value={form.colorway} onChange={handleChange} />
-                    <input className="w-full border p-2 rounded" name="size" placeholder="Size" value={form.size} onChange={handleChange} />
-                    <input className="w-full border p-2 rounded" name="width" placeholder="Width" value={form.width} onChange={handleChange} />
-                    <input className="w-full border p-2 rounded" name="material" placeholder="Material" value={form.material} onChange={handleChange} />
-                    <input className="w-full border p-2 rounded" name="sku_code" placeholder="SKU Code" value={form.sku_code} onChange={handleChange} required />
-                    <input className="w-full border p-2 rounded" name="price" type="number" step="0.01" placeholder="Price" value={form.price} onChange={handleChange} required />
-                    <input className="w-full border p-2 rounded" name="stock" type="number" placeholder="Stock" value={form.stock} onChange={handleChange} required />
+                    <input className="w-full border p-2 rounded" name="brand" placeholder="Brand" value={form.brand || ""} onChange={handleChange} required />
+                    <input className="w-full border p-2 rounded" name="model_name" placeholder="Model Name" value={form.model_name || ""} onChange={handleChange} required />
+                    <input className="w-full border p-2 rounded" name="gender" placeholder="Gender" value={form.gender || ""} onChange={handleChange} />
+                    <input className="w-full border p-2 rounded" name="category" placeholder="Category" value={form.category || ""} onChange={handleChange} />
+                    <input className="w-full border p-2 rounded" name="width" placeholder="Width" value={form.width || ""} onChange={handleChange} />
+                    <input className="w-full border p-2 rounded" name="material" placeholder="Material" value={form.material || ""} onChange={handleChange} />
+                    <input className="w-full border p-2 rounded" name="price" type="number" step="0.01" placeholder="Price" value={form.price || ""} onChange={handleChange} required />
+                    {/* Variants Section */}
+                    <div className="mb-4">
+                      <label className="block font-semibold mb-1">Variants (Color, Size, Stock)</label>
+                      <VariantEditor
+                        variants={form.variants || []}
+                        setVariants={variants => setForm(f => ({ ...f, variants }))}
+                        brand={form.brand}
+                        model={form.model_name}
+                        colorOptions={COLOR_OPTIONS}
+                        sizeOptions={SIZE_OPTIONS}
+                        isEdit={true} // Always true in edit mode
+                      />
+                    </div>
                     <div className="flex justify-between">
                       <button className="bg-yellow-500 hover:bg-yellow-700 text-white px-4 py-2 rounded" type="submit">
                         Update Shoe
@@ -492,7 +883,11 @@ const Admin = () => {
                 <ul>
                   {users.map(user => (
                     <li key={user._id} className="border-b py-2 flex justify-between items-center">
-                      <span>
+                      <span className="flex items-center gap-2">
+                        {/* Green dot if online (using lastActive logic, 10s window) */}
+                        {user.lastActive && (Date.now() - new Date(user.lastActive).getTime() < 10000) && (
+                          <span title="Online" className="inline-block w-3 h-3 rounded-full bg-green-500 mr-1"></span>
+                        )}
                         <b>{user.email}</b> {user.isAdmin && <span className="text-xs bg-dachriRed text-white px-2 py-1 rounded ml-2">Admin</span>}
                         {user.blocked && <span className="text-xs bg-gray-400 text-white px-2 py-1 rounded ml-2">Blocked</span>}
                       </span>
@@ -584,7 +979,7 @@ const Admin = () => {
                   {products.map((product) => (
                     <li key={product._id} className="border-b py-2 flex justify-between items-center">
                       <span>
-                        <b>{product.brand}</b> {product.model_name} (${product.price})
+                        <b>{product.brand}</b> {product.model_name} <span className="text-dachriRed">(KES {Number(product.price).toLocaleString('en-KE', { style: 'decimal', maximumFractionDigits: 2 })})</span>
                         {product.photo && (
                           <img
                             src={`http://localhost:5000/uploads/${product.photo}`}

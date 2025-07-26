@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 
 const ADMIN_EMAIL = "dachri@gmail.com";
 
-const Login = ({ onLogin, isAdminSide, title }) => {
+const Login = ({ onLogin, isAdminSide, title, onLoginSuccess }) => {
   const [form, setForm] = useState({ email: "", password: "" });
   const [message, setMessage] = useState("");
   const navigate = useNavigate();
@@ -23,10 +23,9 @@ const Login = ({ onLogin, isAdminSide, title }) => {
       const res = await loginUser(form);
       localStorage.setItem("token", res.token);
       localStorage.setItem("user", JSON.stringify(res.user));
-      console.log("[DEBUG] Login token:", res.token);
-      console.log("[DEBUG] Login user:", res.user);
       setMessage("");
       if (onLogin) onLogin(res.user);
+      if (onLoginSuccess) onLoginSuccess(res.user);
       // Redirect to admin page if admin credentials are used
       if (res.user.isAdmin) {
         navigate("/admin");

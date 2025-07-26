@@ -17,8 +17,10 @@ export const updateProduct = async (id, product) => {
     return res.data;
 };
 
-export const deleteProduct = async (id) => {
-    const res = await axios.delete(`${API_BASE}/api/products/${id}`);
+export const deleteProduct = async (id, token) => {
+    const res = await axios.delete(`${API_BASE}/api/products/${id}`, {
+        headers: { Authorization: `Bearer ${token}` }
+    });
     return res.data;
 };
 
@@ -95,24 +97,24 @@ export const fetchCart = async (token) => {
   return res.data;
 };
 
-export const addToCart = async (productId, quantity, token) => {
-  const res = await axios.post(`${API_BASE}/api/cart`, { productId, quantity }, {
+export const addToCart = async (productId, quantity, token, color, size) => {
+  const res = await axios.post(`${API_BASE}/api/cart`, { productId, quantity, color, size }, {
     headers: { Authorization: `Bearer ${token}` }
   });
   return res.data;
 };
 
-export const updateCartItem = async (productId, quantity, token) => {
-  const res = await axios.put(`${API_BASE}/api/cart`, { productId, quantity }, {
+export const updateCartItem = async (productId, quantity, token, color, size) => {
+  const res = await axios.put(`${API_BASE}/api/cart`, { productId, quantity, color, size }, {
     headers: { Authorization: `Bearer ${token}` }
   });
   return res.data;
 };
 
-export const removeFromCart = async (productId, token) => {
+export const removeFromCart = async (productId, token, color, size) => {
   const res = await axios.delete(`${API_BASE}/api/cart`, {
     headers: { Authorization: `Bearer ${token}` },
-    data: { productId }
+    data: { productId, color, size }
   });
   return res.data;
 };

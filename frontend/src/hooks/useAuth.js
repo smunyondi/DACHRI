@@ -43,6 +43,8 @@ const useAuth = () => {
         try {
             await api.post('/auth/logout');
             setUser(null);
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
         } catch (err) {
             setError(err);
         }

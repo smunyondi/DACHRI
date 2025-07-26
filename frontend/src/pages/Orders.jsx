@@ -17,7 +17,7 @@ const Orders = () => {
           <li key={order._id} className="border-b py-2">
             <div>
               <b>Order ID:</b> {order._id}<br />
-              <b>Total:</b> ${order.total}<br />
+              <b>Total:</b> KES {Number(order.total).toLocaleString('en-KE', { style: 'decimal', maximumFractionDigits: 2 })}<br />
               <b>Status:</b> {order.status}<br />
               <b>Shipping Address:</b> {order.address || "-"}<br />
               <b>Products:</b>

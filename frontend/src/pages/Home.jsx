@@ -1,31 +1,17 @@
-import React, { useEffect, useState, useRef } from "react";
-import { fetchProducts, addToCart } from "../utils/api";
+import React, { useEffect, useRef, useState } from "react";
+import { addToCart } from "../utils/api";
 import ProductCard from "../components/ProductCard";
 import Notification from "../components/Notification";
 import { Link } from "react-router-dom";
+import { useProducts } from "../context/ProductContext.jsx";
 
 const getCartKey = (userId) => userId ? `cart_${userId}` : "cart_guest";
 
 const Home = ({ search, cart, setCart, userId }) => {
-  const [products, setProducts] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const { products, loading } = useProducts();
   const [error, setError] = useState(null);
   const [notification, setNotification] = useState({ message: "", type: "success" });
   const productsRef = useRef(null);
-
-  useEffect(() => {
-    const getProducts = async () => {
-      try {
-        const data = await fetchProducts();
-        setProducts(Array.isArray(data) ? data : []);
-      } catch (err) {
-        setError(err.message);
-      } finally {
-        setLoading(false);
-      }
-    };
-    getProducts();
-  }, []);
 
   // Scroll to products when search changes and is not empty
   useEffect(() => {
@@ -34,11 +20,11 @@ const Home = ({ search, cart, setCart, userId }) => {
     }
   }, [search]);
 
-  const handleAddToCart = async (product) => {
+  const handleAddToCart = async (product, quantity = 1, color, size) => {
     const token = localStorage.getItem("token");
     if (!token) return;
     try {
-      const updatedCart = await addToCart(product._id, 1, token);
+      const updatedCart = await addToCart(product._id, quantity, token, color, size);
       setCart(updatedCart.items || []);
       setNotification({ message: `${product.model_name} added to cart!`, type: "success" });
     } catch (err) {
@@ -54,8 +40,11 @@ const Home = ({ search, cart, setCart, userId }) => {
   // Filter products by search and in stock
   const filteredProducts = products.filter((product) => {
     if (search.trim() === "") {
-      // No search: show only in-stock
-      return product.stock > 0;
+      // Show products with at least one variant in stock OR with no variants at all
+      return (
+        (Array.isArray(product.variants) && product.variants.some(v => v.stock > 0)) ||
+        !Array.isArray(product.variants) || product.variants.length === 0
+      );
     }
     // With search: show all matching products, regardless of stock
     return (
