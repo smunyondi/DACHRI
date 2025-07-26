@@ -39,7 +39,7 @@ DACHRI SHOES is an online shoe store built using modern web technologies. This p
    pnpm run dev
    ```
 
-2. Open your browser and navigate to `http://localhost:3000` to view the application.
+2. Open your browser and navigate to `http://localhost:5173` to view the application.
 
 ### Features
 - User authentication (sign up, sign in, logout)
